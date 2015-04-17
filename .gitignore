@@ -1,0 +1,72 @@
+##
+# Vim swap/working files.
+*.sw[opa]
+
+##
+# Mac OS-X miscellany.
+.DS_Store
+.AppleDouble
+.LSOverride
+._*
+
+##
+# Windows image file caches
+Thumbs.db
+ehthumbs.db
+
+# Folder config file
+Desktop.ini
+
+##
+# Compiled Object files, Static and Dynamic libs (Shared Objects).
+*.o
+*.a
+*.so
+
+##
+# Folders.
+_obj
+_test
+
+##
+# Architecture specific extensions/prefixes.
+*.[568vq]
+[568vq].out
+
+*.cgo1.go
+*.cgo2.c
+_cgo_defun.c
+_cgo_gotypes.go
+_cgo_export.*
+
+_testmain.go
+
+*.exe
+*.test
+*.prof
+
+##
+# Automatically generated static-data files (a la `go generate ./...`).
+pkg/container/apptemplate/wiring.go
+pkg/container/datastoretemplate/wiring.go
+public/public.go
+
+##
+# Certificate files.
+id_[rd]sa
+*.pem
+*.crt
+*.key
+
+##
+# SublimeText files.
+*.sublime-project
+*.sublime-workspace
+
+##
+# IDEA IntelliJ files.
+*.idea
+*.iml
+
+##
+# Binary artifacts.
