@@ -1,6 +1,6 @@
 # libchanner
 
-This package makes it simple to plug into the power of [libchan](https://github.com/docker/libchan) by providing a set of API functions which perform the repetitive server and client setup.
+This package makes it simple to plug into the power of the [libchan](https://github.com/docker/libchan) RPC library.  Elegant simplicity is achieved by providing a set of API functions which perform the repetitive server and client setup.
 
 The ability to stop the server at any time is also included out of the box thanks to [stoppableListener](https://github.com/jaytaylor/stoppableListener).
 
@@ -19,21 +19,23 @@ Client resources are in [conn.go](https://github.com/jaytaylor/libchanner/blob/m
 
 ## Example usage
 
-[example/main.go](https://github.com/jaytaylor/libchanner/blob/master/example/main.go):
+See [example/main.go](https://github.com/jaytaylor/libchanner/blob/master/example/main.go) for the fully working example.
+
+run it:
+
+```bash
+go run example/main.go
+```
+
+output:
+
+    Successfully decoded time struct! value=2015-04-17 11:34:01.046453821 -0700 PDT
+
+Abreviated highlights:
+
+(for demonstration purposes only, error checking omitted for brevity)
 
 ```go
-package main
-
-import (
-    "encoding/json"
-    "fmt"
-    "os"
-    "time"
-
-    "github.com/docker/libchan"
-    "github.com/jaytaylor/libchanner"
-)
-
 type (
     RemoteRequest struct {
         Command    string
@@ -46,6 +48,33 @@ type (
         Data       []byte
     }
 )
+
+func main() {
+    // Server setup.
+    cs := libchanner.NewChanServer("127.0.0.1:8001", receiverHandler)
+    cs.Start()
+
+    // Shutdown the server after we're done.
+    defer func() {
+        cs.Stop()
+    }()
+
+    // Client setup.
+    ch, _ := libchanner.DialChan("tcp", "127.0.0.1:8001")
+
+    // Send request.
+    req := &RemoteRequest{
+        Command:    "CurrentTime",
+        StatusChan: ch.RemoteSender,
+    }
+    ch.Sender.Send(req)
+
+    // Get response.
+    response := &RemoteResponse{}
+    ch.Receiver.Receive(response)
+
+    // Now do anything you want with the response!
+}
 
 // receiverHandler conforms to the ReceiverHandler type.
 func receiverHandler(receiver libchan.Receiver) {
@@ -85,70 +114,9 @@ func requestHandler(rr *RemoteRequest) *RemoteResponse {
 
     return response
 }
-
-func main() {
-    addr := "127.0.0.1:8001"
-    cs := libchanner.NewChanServer(addr, receiverHandler)
-    cs.Quiet = true // Suppress internal ChanServer logging.
-    if err := cs.Start(); err != nil {
-        errExitf("error starting server: %s", err)
-    }
-
-    // Shutdown the server after we're done.
-    defer func() {
-        if err := cs.Stop(); err != nil {
-            errExitf("error stopping server: %s", err)
-        }
-    }()
-
-    // Connect to the libchan server.
-    ch, err := libchanner.DialChan("tcp", addr)
-    if err != nil {
-        errExitf("error connecting to server: %s", err)
-    }
-
-    req := &RemoteRequest{
-        Command:    "CurrentTime",
-        StatusChan: ch.RemoteSender,
-    }
-    if err := ch.Sender.Send(req); err != nil {
-        errExitf("error sending remote request: %s", err)
-    }
-
-    response := &RemoteResponse{}
-    if err := ch.Receiver.Receive(response); err != nil {
-        errExitf("error receiving remote response: %s", err)
-    }
-
-    if response.StatusCode != 0 {
-        errExitf("non-zero status code in response: %v, message=%s", response.StatusCode, response.Message)
-    }
-
-    ts := &time.Time{}
-    if err := json.Unmarshal(response.Data, ts); err != nil {
-        errExitf("failed to decode time struct from json: %s", err)
-    }
-
-    fmt.Printf("Successfully decoded time struct! value=%s\n", *ts)
-}
-
-func errExitf(format string, args ...interface{}) {
-    os.Stderr.WriteString(fmt.Sprintf(format+"\n", args...))
-    os.Exit(1)
-}
 ```
 
-running the example:
-
-```bash
-go run example/main.go
-```
-
-output:
-
-    Successfully decoded time struct! value=2015-04-17 11:34:01.046453821 -0700 PDT
-
-see the [unit-tests](https://github.com/jaytaylor/libchanner/blob/master/chan_server_test.go) for additional example(s).
+also see the [unit-tests](https://github.com/jaytaylor/libchanner/blob/master/chan_server_test.go) for additional example usage.
 
 ## Unit-tests
 
