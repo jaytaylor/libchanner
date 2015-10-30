@@ -131,6 +131,15 @@ func (cs *ChanServer) Stop() error {
 	return nil
 }
 
+// Addr returns the listener address.
+func (cs *ChanServer) Addr() string {
+	if cs.listener == nil {
+		return ""
+	}
+	addr := cs.listener.Addr().String()
+	return addr
+}
+
 // info provides suppressable Info-level logging.
 func (cs *ChanServer) info(format string, args ...interface{}) {
 	if !cs.Quiet {
