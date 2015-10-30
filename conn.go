@@ -12,10 +12,10 @@ type Chan struct {
 	Sender       libchan.Sender
 	Receiver     libchan.Receiver
 	RemoteSender libchan.Sender
-	Transport    *spdy.Transport
+	Transport    libchan.Transport
 }
 
-// NewChannel opens a new libchan SPDY channel to the specified address
+// DialChan opens a new libchan SPDY channel to the specified address
 // (host:port).
 //
 // Don't forget to close the transport after you're done using the channel.
@@ -44,10 +44,11 @@ func DialChanTimeout(network string, addr string, timeout time.Duration) (*Chan,
 }
 
 func connToChan(conn net.Conn) (*Chan, error) {
-	transport, err := spdy.NewClientTransport(conn)
+	provider, err := spdy.NewSpdyStreamProvider(conn, false)
 	if err != nil {
 		return nil, err
 	}
+	transport := spdy.NewTransport(provider)
 
 	sender, err := transport.NewSendChannel()
 	if err != nil {

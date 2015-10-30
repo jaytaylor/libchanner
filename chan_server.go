@@ -3,6 +3,7 @@ package libchanner
 import (
 	"errors"
 	"net"
+	"strings"
 	"sync"
 
 	"github.com/docker/libchan"
@@ -17,13 +18,12 @@ type ReceiverHandler func(receiver libchan.Receiver)
 // ChanServer provides a generic stoppable TCP server which is wired to
 // any desired channel receiver handler.
 type ChanServer struct {
-	Quiet             bool // When true, logging will be suppressed.
-	laddr             string
-	receiverHandler   ReceiverHandler
-	listener          *stoppableListener.StoppableListener
-	transportListener *spdy.TransportListener
-	lock              sync.Mutex
-	stop              chan chan bool
+	Quiet           bool // When true, logging will be suppressed.
+	laddr           string
+	receiverHandler ReceiverHandler
+	listener        *stoppableListener.StoppableListener
+	lock            sync.Mutex
+	stop            chan chan bool
 }
 
 var (
@@ -52,7 +52,7 @@ func (cs *ChanServer) Start() error {
 	cs.lock.Lock()
 	defer cs.lock.Unlock()
 
-	cs.info("starting laddr=%s", cs.laddr)
+	cs.info("Starting laddr=%s", cs.laddr)
 
 	if cs.listener != nil {
 		return AlreadyRunningError
@@ -68,31 +68,44 @@ func (cs *ChanServer) Start() error {
 		return err
 	}
 	cs.listener = stoppable
-
-	transportListener, err := spdy.NewTransportListener(cs.listener, spdy.NoAuthenticator)
-	if err != nil {
-		return err
+	if strings.HasSuffix(cs.laddr, ":0") {
+		cs.laddr = cs.Addr()
 	}
-	cs.transportListener = transportListener
 
 	go func() {
 		for {
-			if cs.listener == nil || cs.transportListener == nil {
-				cs.info("listener is nil, accept loop exiting")
-				break
-			}
-			t, err := cs.transportListener.AcceptTransport()
-			if err != nil {
-				cs.info("accepting from transport failed: %s, accept loop exiting", err)
+			if cs.listener == nil {
+				cs.info("Nil listener detected (accept loop exiting)")
 				break
 			}
 
+			conn, err := cs.listener.Accept()
+			if err != nil {
+				cs.info("Accepting from transport failed: %s (accept loop exiting)", err)
+				break
+			}
+
+			provider, err := spdy.NewSpdyStreamProvider(conn, true)
+			if err != nil {
+				cs.info("Getting new SpdyStreamProvider failed: %s (accept loop exiting)", err)
+				break
+			}
+
+			transport := spdy.NewTransport(provider)
+
 			go func() {
-				defer t.Close()
+				defer func() {
+					if err := provider.Close(); err != nil {
+						cs.error("Closing provider: %s", err)
+					}
+					if err := conn.Close(); err != nil {
+						cs.error("Closing conn: %s", err)
+					}
+				}()
 				for {
-					receiver, err := t.WaitReceiveChannel()
+					receiver, err := transport.WaitReceiveChannel()
 					if err != nil {
-						cs.error("waiting for channel receiver failed: %s, connection loop exiting", err)
+						cs.error("Waiting for channel receiver failed: %s, connection loop exiting", err)
 						break
 					}
 					go cs.receiverHandler(receiver)
@@ -100,7 +113,7 @@ func (cs *ChanServer) Start() error {
 			}()
 		}
 	}()
-	cs.info("started laddr=%s", cs.laddr)
+	cs.info("Started laddr=%s", cs.laddr)
 	return nil
 }
 
@@ -109,24 +122,19 @@ func (cs *ChanServer) Stop() error {
 	cs.lock.Lock()
 	defer cs.lock.Unlock()
 
-	cs.info("stopping laddr=%s", cs.laddr)
+	cs.info("Stopping laddr=%s", cs.laddr)
 
 	if cs.listener == nil {
 		return NotRunningError
-	}
-
-	if err := cs.transportListener.Close(); err != nil {
-		return err
 	}
 
 	if err := cs.listener.StopSafely(); err != nil {
 		return err
 	}
 
-	cs.transportListener = nil
 	cs.listener = nil
 
-	cs.info("stopped laddr=%s", cs.laddr)
+	cs.info("Stopped laddr=%s", cs.laddr)
 
 	return nil
 }
