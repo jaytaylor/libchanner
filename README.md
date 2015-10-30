@@ -10,6 +10,11 @@ The ability to stop the server at any time is also included out of the box thank
     go get -u https://github.com/jaytaylor/libchanner/...
 
 
+## Important
+
+This package only works with libchan v0.1.x series.
+
+
 ## Code layout
 
 Server resources are in [chan_server.go](https://github.com/jaytaylor/libchanner/blob/master/chan_server.go)
