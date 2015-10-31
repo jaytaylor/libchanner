@@ -131,6 +131,14 @@ func (cs *ChanServer) Stop() error {
 	return nil
 }
 
+// Addr returns the listener address and port.
+func (cs *ChanServer) Addr() net.Addr {
+	if cs.listener == nil {
+		return &net.IPNet{}
+	}
+	return cs.listener.Addr()
+}
+
 // info provides suppressable Info-level logging.
 func (cs *ChanServer) info(format string, args ...interface{}) {
 	if !cs.Quiet {
