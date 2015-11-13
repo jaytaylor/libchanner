@@ -67,8 +67,7 @@ func requestHandler(rr *RemoteRequest) *RemoteResponse {
 }
 
 func Test_ChanServer(t *testing.T) {
-	addr := "127.0.0.1:8001"
-	cs := NewChanServer(addr, receiverHandler)
+	cs := NewChanServer("", receiverHandler)
 	if err := cs.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -79,7 +78,7 @@ func Test_ChanServer(t *testing.T) {
 		}
 	}()
 
-	ch, err := DialChanTimeout("tcp", addr, 2*time.Second)
+	ch, err := DialChanTimeout("tcp", cs.Addr().String(), 2*time.Second)
 	if err != nil {
 		t.Fatal(err)
 	}

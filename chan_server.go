@@ -23,7 +23,7 @@ type ChanServer struct {
 	listener          *stoppableListener.StoppableListener
 	transportListener *spdy.TransportListener
 	lock              sync.Mutex
-	stop              chan chan bool
+	stop              chan struct{}
 }
 
 var (
@@ -42,7 +42,7 @@ func NewChanServer(laddr string, receiverHandler ReceiverHandler) *ChanServer {
 	cs := &ChanServer{
 		laddr:           laddr,
 		receiverHandler: receiverHandler,
-		stop:            make(chan chan bool, 1),
+		stop:            make(chan struct{}, 1),
 	}
 	return cs
 }
@@ -77,10 +77,13 @@ func (cs *ChanServer) Start() error {
 
 	go func() {
 		for {
-			if cs.listener == nil || cs.transportListener == nil {
-				cs.info("listener is nil, accept loop exiting")
+			select {
+			case <-cs.stop:
+				cs.info("listener accept transport loop exiting")
 				break
+			default:
 			}
+
 			t, err := cs.transportListener.AcceptTransport()
 			if err != nil {
 				cs.info("accepting from transport failed: %s, accept loop exiting", err)
@@ -114,6 +117,8 @@ func (cs *ChanServer) Stop() error {
 	if cs.listener == nil {
 		return NotRunningError
 	}
+
+	cs.stop <- struct{}{}
 
 	if err := cs.transportListener.Close(); err != nil {
 		return err
