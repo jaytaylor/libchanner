@@ -22,6 +22,7 @@ type ChanServer struct {
 	receiverHandler   ReceiverHandler
 	listener          *stoppableListener.StoppableListener
 	transportListener *spdy.TransportListener
+	running           bool
 	lock              sync.Mutex
 	stop              chan struct{}
 }
@@ -42,7 +43,6 @@ func NewChanServer(laddr string, receiverHandler ReceiverHandler) *ChanServer {
 	cs := &ChanServer{
 		laddr:           laddr,
 		receiverHandler: receiverHandler,
-		stop:            make(chan struct{}, 1),
 	}
 	return cs
 }
@@ -54,8 +54,12 @@ func (cs *ChanServer) Start() error {
 
 	cs.info("starting laddr=%s", cs.laddr)
 
-	if cs.listener != nil {
+	if cs.running {
 		return AlreadyRunningError
+	}
+
+	if cs.stop == nil {
+		cs.stop = make(chan struct{}, 1)
 	}
 
 	// Underlying remote channel listener.
@@ -104,6 +108,7 @@ func (cs *ChanServer) Start() error {
 		}
 	}()
 	cs.info("started laddr=%s", cs.laddr)
+	cs.running = true
 	return nil
 }
 
@@ -114,22 +119,25 @@ func (cs *ChanServer) Stop() error {
 
 	cs.info("stopping laddr=%s", cs.laddr)
 
-	if cs.listener == nil {
+	if cs.running == false {
 		return NotRunningError
 	}
 
-	cs.stop <- struct{}{}
+	if cs.stop != nil {
+		cs.stop <- struct{}{}
+		cs.stop = nil
+	}
 
 	if err := cs.transportListener.Close(); err != nil {
 		return err
 	}
+	// cs.transportListener = nil
 
 	if err := cs.listener.StopSafely(); err != nil {
 		return err
 	}
-
-	cs.transportListener = nil
-	cs.listener = nil
+	// cs.listener = nil
+	cs.running = false
 
 	cs.info("stopped laddr=%s", cs.laddr)
 
